@@ -26,33 +26,37 @@ class SemanticRouter:
             ("user", "{query}")
         ])
         
-        self.chain = self.prompt | self.llm
-        logger.info("Semantic Router initialized with robust error handling.")
+        logger.info("Semantic Router initialized. Manual RAG trigger: '#'")
 
     def route_query(self, query: str) -> IntentClassification:
         """
         사용자 쿼리의 의도를 분류합니다. 
-        0.5B 모델의 불안정한 출력을 대비해 강력한 후처리를 수행합니다.
+        '#' 기호로 시작하면 즉시 RAG 경로를 타도록 강제합니다.
         """
+        clean_query = query.strip()
+        
+        # 1. '#' 기호 강제 RAG 로직 (Manual Trigger)
+        if clean_query.startswith("#"):
+            logger.info("Manual RAG trigger (#) detected.")
+            return IntentClassification(
+                intent="RETRIEVAL_REQUIRED", 
+                reason="Manual trigger via hashtag"
+            )
+
+        # 2. 모델 기반 분류 (그 외의 경우)
         try:
-            # invoke 결과는 AIMessage
-            res_msg = self.llm.invoke(self.prompt.format(query=query))
+            res_msg = self.llm.invoke(self.prompt.format(query=clean_query))
             content = res_msg.content.strip()
             
-            # 1. JSON 파싱 시도
             try:
                 parsed = self.parser.parse(content)
                 return IntentClassification(**parsed)
             except:
-                # 2. 텍스트 직접 매칭 (Fallback)
                 content_upper = content.upper()
                 if "RETRIEVAL" in content_upper:
-                    return IntentClassification(intent="RETRIEVAL_REQUIRED", reason="Keyword match: retrieval")
-                elif "GENERAL" in content_upper:
-                    return IntentClassification(intent="GENERAL_CONVERSATION", reason="Keyword match: general")
-                else:
-                    return IntentClassification(intent="AMBIGUOUS", reason="Keyword match: ambiguous")
+                    return IntentClassification(intent="RETRIEVAL_REQUIRED", reason="Keyword match in model response")
+                return IntentClassification(intent="GENERAL_CONVERSATION", reason="Fallback to general conversation")
                     
         except Exception as e:
-            logger.error(f"Routing critical error: {e}")
-            return IntentClassification(intent="RETRIEVAL_REQUIRED", reason="Critical error fallback")
+            logger.error(f"Routing error: {e}")
+            return IntentClassification(intent="RETRIEVAL_REQUIRED", reason="Critical error fallback to RAG")

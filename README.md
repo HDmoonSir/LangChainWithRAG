@@ -5,7 +5,9 @@ LangChain을 기반으로 한 로컬 구동형 Multi-LLM RAG 서비스 프로토
 ## 🌟 Key Features
 
 - **Multi-LLM Architecture**: 0.5B 모델(Router/Rewriter)과 7B-Int4 모델(Generator)의 역할 분담으로 효율성 극대화
-- **Intelligent Routing**: 질문의 의도(일상 대화 vs 문서 질문)를 파악하여 최적의 경로로 처리
+- **Intelligent & Manual Routing**: 
+  - 질문의 의도(일상 대화 vs 문서 질문)를 모델이 자동으로 파악
+  - 질문 시작 부분에 **`#` 기호를 사용하여 명시적으로 RAG 모드 강제 활성화** 가능 (예: `#복리후생에 대해 알려줘`)
 - **High-Performance Ingestion**: Docling을 사용한 정교한 문서 파싱 및 BGE-M3 임베딩 적용
 - **Reranking**: BGE-Reranker-v2-m3를 통한 검색 결과 정밀 재정렬
 - **FastAPI Streaming**: 지연 시간을 최소화하는 실시간 스트리밍 응답 제공
@@ -73,11 +75,20 @@ python run_server.py
 
 ## 📡 API Usage
 
-### Streaming Chat
+### Streaming Chat (Normal)
 ```bash
 curl -X POST http://localhost:8000/chat/stream \
      -H "Content-Type: application/json" \
-     -d '{"query": "유급 휴가 규정에 대해서 설명해줘"}' \
+     -d '{"query": "안녕하세요"}' \
+     --no-buffer
+```
+
+### Streaming Chat (Manual RAG Trigger)
+질문 시작 부분에 `#`을 붙여 문서 검색을 강제합니다.
+```bash
+curl -X POST http://localhost:8000/chat/stream \
+     -H "Content-Type: application/json" \
+     -d '{"query": "#유급 휴가 규정에 대해서 설명해줘"}' \
      --no-buffer
 ```
 
