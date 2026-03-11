@@ -1,0 +1,26 @@
+# Core RAG Stack
+langchain
+langchain-community
+langchain-openai
+langchain-qdrant
+langchain-text-splitters
+langchain-huggingface
+qdrant-client
+docling
+
+# Models & Embeddings
+sentence-transformers
+einops
+vllm
+
+# API & Utils
+fastapi
+uvicorn
+python-dotenv
+pydantic
+pydantic-settings
+requests
+loguru
+
+# Evaluation
+ragas

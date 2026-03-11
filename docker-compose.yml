@@ -1,0 +1,63 @@
+services:
+  # 1. Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+    restart: always
+
+  # 2. vLLM Router (Qwen-0.5B) - GPU 1
+  vllm-router:
+    image: vllm/vllm-openai:v0.6.3
+    container_name: vllm-router
+    ports:
+      - "8001:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1']
+              capabilities: [gpu]
+    command: >
+      --model Qwen/Qwen2.5-0.5B-Instruct
+      --served-model-name qwen-router
+      --gpu-memory-utilization 0.3
+      --max-model-len 4096
+      --dtype half
+    restart: always
+
+  # 3. vLLM Main LLM (Qwen-7B-Int4) - GPU 0
+  vllm-main:
+    image: vllm/vllm-openai:v0.6.3
+    container_name: vllm-main
+    ports:
+      - "8002:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    command: >
+      --model Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4
+      --served-model-name qwen-main
+      --gpu-memory-utilization 0.8
+      --max-model-len 8192
+      --dtype half
+    restart: always
+
+networks:
+  default:
+    name: rag-network
