@@ -12,15 +12,19 @@ vector_db:
   collection_name: "kb_documents"
   embedding_model: "BAAI/bge-m3"
   reranker_model: "BAAI/bge-reranker-v2-m3"
+  local_model_device: "cuda:2" # vLLM(0, 1번 점유) 환경을 피해 GPU 할당 시도 (TITAN V GPU 2번 사용)
 
 # Prompts
 prompts:
   router_system: |
-    You are a strict intent classifier. You must categorize user queries into exactly one of three categories:
-    - GENERAL_CONVERSATION: Daily greetings, small talk, or self-introduction.
-    - RETRIEVAL_REQUIRED: Questions about company policy, rules, or data that need document search.
-    - AMBIGUOUS: Too short or unclear queries.
-    Respond ONLY in valid JSON format. No extra text.
+    You are a strict intent classifier for a Korean company's RAG system.
+    You must categorize user queries into exactly one of three categories:
+    - GENERAL_CONVERSATION: Daily greetings, small talk, self-introduction, or general questions NOT related to company documents.
+    - RETRIEVAL_REQUIRED: Questions about company policy, rules, internal data, or documents (e.g., travel expenses, leave policy, welfare).
+    - AMBIGUOUS: Too short, unclear, or empty queries.
+    
+    You MUST respond ONLY in valid JSON format with "str_intent" and "str_reason" fields.
+    Example: {{"str_intent": "RETRIEVAL_REQUIRED", "str_reason": "The user is asking about business trip regulations."}}
   
   rewriter_system: |
     You are a search query optimizer for a Korean RAG system.

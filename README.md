@@ -1,96 +1,91 @@
-# High-Performance Multi-LLM RAG Engine
+# Production-Ready Multi-LLM RAG Engine
 
-LangChain을 기반으로 한 로컬 구동형 Multi-LLM RAG 서비스 프로토타입입니다. 0.5B 모델을 이용한 지능형 라우팅 및 7B 모델을 이용한 고성능 답변 생성을 지원합니다.
+본 프로젝트는 LangChain(LCEL)을 기반으로 구축된 고성능 로컬 RAG 서비스입니다. 0.5B 모델을 통한 지능형 라우팅과 7B 모델의 강력한 답변 생성을 결합하였으며, 엔터프라이즈 급의 안정성을 위한 구조적 고도화가 적용되었습니다.
 
 ## 🌟 Key Features
 
-- **Multi-LLM Architecture**: 0.5B 모델(Router/Rewriter)과 7B-Int4 모델(Generator)의 역할 분담으로 효율성 극대화
-- **Intelligent & Manual Routing**: 
-  - 질문의 의도(일상 대화 vs 문서 질문)를 모델이 자동으로 파악
-  - 질문 시작 부분에 **`#` 기호를 사용하여 명시적으로 RAG 모드 강제 활성화** 가능 (예: `#복리후생에 대해 알려줘`)
-- **High-Performance Ingestion**: Docling을 사용한 정교한 문서 파싱 및 BGE-M3 임베딩 적용
-- **Reranking**: BGE-Reranker-v2-m3를 통한 검색 결과 정밀 재정렬
-- **FastAPI Streaming**: 지연 시간을 최소화하는 실시간 스트리밍 응답 제공
-- **Robustness**: 0.5B 모델의 불안정한 출력을 보완하는 강력한 에러 핸들링 로직
+- **Multi-LLM Pipeline**: 
+  - **Router/Rewriter**: Qwen2.5-0.5B (지연 시간 최소화 및 의도 분류)
+  - **Generator**: Qwen2.5-7B (정밀한 답변 생성)
+- **Hybrid Retrieval & Reranking**: 
+  - BGE-M3 임베딩을 통한 다국어 하이브리드 검색 지원
+  - BGE-Reranker-v2-m3를 이용한 검색 결과 2차 정밀 재정렬
+- **Standardized SSE Streaming**: 
+  - `token`, `error`, `metadata`, `finish` 프레임으로 표준화된 JSON 기반 실시간 응답
+- **Intelligent Routing**: 
+  - `#` 트리거를 통한 명시적 지식 검색(RAG) 강제 활성화 지원
+
+## 🛡️ Technical Excellence
+
+- **Robust Configuration**: Pydantic 기반의 Settings 모델을 도입하여 필수 환경 변수(`.env`) 검증 및 타입 안전성 확보
+- **Lifespan Management**: FastAPI의 `lifespan` 이벤트를 통해 파이프라인 및 모델 클라이언트를 서버 시작 시 명시적으로 초기화 및 조립
+- **Deterministic Indexing**: 문서 해시(Fingerprint) 기반의 ID 생성 로직을 통해 동일 문서 재업로드 시 `upsert`를 통한 중복 데이터 제거
+- **Auto-Dimension Detection**: 임베딩 모델의 차원을 실시간 감지하여 Qdrant 컬렉션 정합성을 자동으로 검증 및 생성
+- **Modular Architecture**: 설정, 엔진, API 계층의 명확한 분리를 통한 유지보수성 및 확장성 확보
 
 ## 🛠 Tech Stack
 
 - **Framework**: LangChain (LCEL)
-- **Serving**: vLLM (Docker)
-- **Models**: Qwen2.5-0.5B-Instruct, Qwen2.5-7B-Instruct-GPTQ-Int4
-- **Parsing**: Docling
-- **Embedding**: BGE-M3
+- **Serving**: vLLM (OpenAI Compatible API)
+- **Parsing**: Docling (High-performance Document Analysis)
 - **Vector DB**: Qdrant
-- **Reranker**: BGE-Reranker-v2-m3
-- **API**: FastAPI
+- **Models**: Qwen2.5-0.5B-Instruct, Qwen2.5-7B-Instruct-GPTQ-Int4
+- **API**: FastAPI (Asynchronous Stream Support)
 
 ## 📁 Project Structure
 
 ```text
 llm_langchain/
-├── config/
-│   └── settings.yaml      # 프롬프트 및 비민감 설정 관리
-├── data/
-│   └── docs/              # 분석 대상 PDF/Docx 문서 보관
 ├── src/
-│   ├── ingestion/         # 문서 파싱 및 벡터화 로직
-│   ├── rag/               # Router, Rewriter, Retriever 등 핵심 로직
-│   └── utils/             # Config Loader 등 유틸리티
-├── .env.example           # 환경 변수 템플릿
-├── docker-compose.yml     # Qdrant 및 vLLM 통합 인프라 설정
-├── run_ingest.py          # 데이터 인제스천 실행 스크립트
-├── run_server.py          # FastAPI 서버 실행 스크립트
-└── requirements.txt       # 의존성 패키지 목록
+│   ├── app/               # API Transport Layer (Routes, Factory, Schemas, Streaming)
+│   ├── rag/               # Core Domain Logic (Pipeline, Router, Retriever, Rewriter)
+│   ├── ingestion/         # Data Pipeline (Docling, Embedder, Fingerprint)
+│   ├── config/            # Structured Configuration System
+│   └── utils/             # Common Utilities
+├── config/                # YAML Settings & Centralized Prompts
+├── data/docs/             # Source Documents (PDF/Docx)
+├── run_ingest.py          # Ingestion Entrypoint (Upsert Logic)
+└── run_server.py          # API Server Entrypoint (Lifespan Logic)
 ```
 
 ## 🚀 Getting Started
 
 ### 1. 인프라 가동 (Docker)
-NVIDIA Container Toolkit이 설치된 환경에서 아래 명령어를 실행합니다.
 ```bash
 docker-compose up -d
 ```
 
-### 2. 환경 설정
-`.env.example` 파일을 복사하여 `.env` 파일을 생성하고 실제 IP 주소를 입력합니다.
-```bash
-cp .env.example .env
-```
-
-### 3. 의존성 설치
+### 2. 의존성 설치 및 환경 설정
 ```bash
 pip install -r requirements.txt
+cp .env.example .env  # 필수 환경 변수(VLLM_URL 등) 설정
 ```
 
-### 4. 데이터 인제스천
-`data/docs/` 폴더에 PDF 파일을 넣은 후 실행합니다.
+### 3. 데이터 인제스천 (중복 방지 지원)
+`data/docs/` 폴더에 문서를 배치한 후 실행합니다.
 ```bash
 python run_ingest.py
 ```
 
-### 5. 서버 실행
+### 4. 서버 실행
 ```bash
 python run_server.py
 ```
 
-## 📡 API Usage
+## 📡 API Usage (SSE JSON Frame)
 
-### Streaming Chat (Normal)
 ```bash
 curl -X POST http://localhost:8000/chat/stream \
      -H "Content-Type: application/json" \
-     -d '{"query": "안녕하세요"}' \
-     --no-buffer
+     -d '{"query": "#우리 회사 연차 규정을 요약해줘."}'
 ```
 
-### Streaming Chat (Manual RAG Trigger)
-질문 시작 부분에 `#`을 붙여 문서 검색을 강제합니다.
-```bash
-curl -X POST http://localhost:8000/chat/stream \
-     -H "Content-Type: application/json" \
-     -d '{"query": "#유급 휴가 규정에 대해서 설명해줘"}' \
-     --no-buffer
+**응답 예시 (Standardized Frame):**
+```json
+data: {"str_event": "token", "dict_data": {"token": "연"}}
+data: {"str_event": "token", "dict_data": {"token": "차"}}
+data: {"str_event": "finish", "dict_data": {"status": "complete"}}
 ```
 
 ---
-본 프로젝트는 Titan V (12GB VRAM) 3장 환경에 최적화되어 설계되었습니다.
+본 프로젝트는 Titan V (12GB VRAM) 3장 환경에서 검증되었으며, GPU 가용성에 따라 동적으로 실행 장치(CUDA/CPU)를 선택합니다.

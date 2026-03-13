@@ -1,66 +1,110 @@
-import os
+import torch
 import typing as tp
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_qdrant import QdrantVectorStore
 from loguru import logger
-from dotenv import load_dotenv
-
-load_dotenv()
+from src.config.schemas import AppConfig, VectorDBConfig
 
 class RAGEmbedder:
-    def __init__(self, collection_name: str = "kb_documents"):
-        self.model_name = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-m3")
-        self.qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
-        self.collection_name = collection_name
+    """
+    텍스트를 벡터로 변환하고 벡터 데이터베이스(Qdrant)에 저장하는 책임을 가진다.
+    """
+    def __init__(self, obj_config: AppConfig) -> None:
+        """
+        주입받은 설정을 통해 임베딩 모델과 벡터 DB 클라이언트를 초기화한다.
+        실제 환경의 GPU 가용성을 체크하여 런타임 오류를 방지한다.
+        """
+        self.obj_config: AppConfig = obj_config
+        obj_vdbCfg: VectorDBConfig = obj_config.obj_vectorDb
         
-        # BGE-M3 임베딩 모델 초기화
-        self.embedding_model = HuggingFaceEmbeddings(
-            model_name=self.model_name,
-            model_kwargs={'device': 'cpu'},  # GPU 사용 시 'cuda'로 변경 권장
-            encode_kwargs={'normalize_embeddings': True}
-        )
+        # 1. 실행 장치 결정 (Dynamic Device Selection)
+        str_requestedDevice: str = obj_vdbCfg.str_localModelRuntimeDevice
+        str_finalDevice: str = "cpu"
         
-        # Qdrant 클라이언트 초기화
-        self.client = QdrantClient(url=self.qdrant_url)
-        self._ensure_collection()
-        
-        # LangChain 연동 Vector Store (최신 사양에 맞춰 'embedding' 인자 사용)
-        self.vector_store = QdrantVectorStore(
-            client=self.client,
-            collection_name=self.collection_name,
-            embedding=self.embedding_model
-        )
-        logger.info(f"Embedder initialized with model: {self.model_name}")
+        if "cuda" in str_requestedDevice.lower():
+            if torch.cuda.is_available():
+                str_finalDevice = str_requestedDevice
+                logger.info(f"Using requested GPU device: {str_finalDevice}")
+            else:
+                logger.warning(f"CUDA requested ({str_requestedDevice}) but not available. Falling back to 'cpu'.")
+                str_finalDevice = "cpu"
+        else:
+            str_finalDevice = "cpu"
+            logger.info("Using 'cpu' device as requested.")
 
-    def _ensure_collection(self):
-        """
-        Qdrant 컬렉션이 없으면 생성합니다.
-        BGE-M3의 차원은 1024입니다.
-        """
-        collections = self.client.get_collections().collections
-        exists = any(c.name == self.collection_name for c in collections)
+        # 2. 임베딩 모델 초기화
+        self.obj_embeddingModel: HuggingFaceEmbeddings = HuggingFaceEmbeddings(
+            model_name=obj_vdbCfg.str_embeddingModel,
+            model_kwargs=dict(device=str_finalDevice),
+            encode_kwargs=dict(normalize_embeddings=True)
+        )
         
-        if not exists:
-            logger.info(f"Creating Qdrant collection: {self.collection_name}")
-            self.client.create_collection(
-                collection_name=self.collection_name,
+        # 3. Qdrant 클라이언트 초기화
+        self.obj_client: QdrantClient = QdrantClient(url=str(obj_vdbCfg.obj_qdrantUrl))
+        self.str_collectionName: str = obj_vdbCfg.str_collectionName
+        
+        # 4. 컬렉션 정합성 확인 및 생성 (차원 자동 감지)
+        self._ensure_collection_integrity()
+        
+        # 5. Vector Store 래퍼 초기화
+        self.obj_vectorStore: QdrantVectorStore = QdrantVectorStore(
+            client=self.obj_client,
+            collection_name=self.str_collectionName,
+            embedding=self.obj_embeddingModel
+        )
+        logger.info(f"RAGEmbedder initialized. Collection: {self.str_collectionName}, Final Device: {str_finalDevice}")
+
+    def _ensure_collection_integrity(self) -> None:
+        """
+        임베딩 모델의 실제 차원을 확인하고 Qdrant 컬렉션과의 일치 여부를 검증한다.
+        """
+        list_probeVec: tp.List[float] = self.obj_embeddingModel.embed_query("dimension_check")
+        int_modelDim: int = len(list_probeVec)
+        
+        list_collections: tp.List[tp.Any] = self.obj_client.get_collections().collections
+        bool_exists: bool = any(obj_c.name == self.str_collectionName for obj_c in list_collections)
+        
+        if not bool_exists:
+            logger.info(f"Creating new collection '{self.str_collectionName}' (Dim: {int_modelDim})")
+            self.obj_client.create_collection(
+                collection_name=self.str_collectionName,
                 vectors_config=models.VectorParams(
-                    size=1024,  # BGE-M3 dense vector size
+                    size=int_modelDim,
                     distance=models.Distance.COSINE
                 )
             )
+            return
 
-    def add_documents(self, texts: tp.List[str], metadatas: tp.List[tp.Dict[str, tp.Any]]):
-        """
-        텍스트와 메타데이터를 벡터화하여 저장합니다.
-        """
-        logger.info(f"Indexing {len(texts)} chunks into Qdrant...")
-        self.vector_store.add_texts(texts=texts, metadatas=metadatas)
-        logger.success("Indexing complete.")
+        obj_info: tp.Any = self.obj_client.get_collection(self.str_collectionName)
+        int_existingDim: int = tp.cast(int, obj_info.config.params.vectors.size)
+        
+        if int_existingDim != int_modelDim:
+            raise ValueError(
+                f"Collection dimension mismatch! Existing: {int_existingDim}, Model: {int_modelDim}."
+            )
 
-if __name__ == "__main__":
-    # 간단한 연결 테스트
-    embedder = RAGEmbedder()
-    print("Qdrant & Embedding Setup Ready.")
+    def upsert_documents(
+        self, 
+        list_texts: tp.List[str], 
+        list_metadatas: tp.List[tp.Dict[str, tp.Any]], 
+        list_ids: tp.List[str]
+    ) -> None:
+        """
+        결정적 ID를 사용하여 텍스트와 메타데이터를 저장하거나 업데이트(Upsert)한다.
+        """
+        if not list_texts:
+            logger.warning("No texts provided for upsert.")
+            return
+
+        if not (len(list_texts) == len(list_metadatas) == len(list_ids)):
+            raise ValueError("Mismatched lengths of texts, metadatas, or ids.")
+
+        logger.info(f"Upserting {len(list_texts)} chunks into collection '{self.str_collectionName}'")
+        self.obj_vectorStore.add_texts(
+            texts=list_texts,
+            metadatas=list_metadatas,
+            ids=list_ids
+        )
+        logger.success(f"Successfully upserted {len(list_texts)} chunks.")

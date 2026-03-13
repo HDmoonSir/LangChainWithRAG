@@ -1,62 +1,36 @@
 import typing as tp
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
-from pydantic import BaseModel, Field
 from loguru import logger
-from src.utils.config_loader import config
-
-class IntentClassification(BaseModel):
-    intent: str = Field(description="The intent classification")
-    reason: str = Field(description="The reason for classification")
+from src.config.schemas import AppConfig
 
 class SemanticRouter:
-    def __init__(self):
-        llm_cfg = config.get_llm_config("router")
-        self.llm = ChatOpenAI(
-            model=llm_cfg["model_name"],
-            openai_api_key="none",
-            openai_api_base=llm_cfg["url"],
-            temperature=0.0
-        )
-        
-        self.parser = JsonOutputParser(pydantic_object=IntentClassification)
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", config.get_prompt("router_system")),
-            ("user", "{query}")
-        ])
-        
-        logger.info("Semantic Router initialized. Manual RAG trigger: '#'")
-
-    def route_query(self, query: str) -> IntentClassification:
+    """
+    사용자의 자연어 질의에서 '#' 트리거 여부를 확인하여 처리 경로를 결정하는 책임을 가진다.
+    LLM 기반 분류 대신 규칙 기반(Rule-based)의 결정적 라우팅을 수행한다.
+    """
+    def __init__(self, obj_config: AppConfig) -> None:
         """
-        사용자 쿼리의 의도를 분류합니다. 
-        '#' 기호로 시작하면 즉시 RAG 경로를 타도록 강제합니다.
+        주입받은 설정을 보관한다. 트리거 방식에서는 별도의 모델 로딩이 필요하지 않다.
         """
-        clean_query = query.strip()
-        
-        # 1. '#' 기호 강제 RAG 로직 (Manual Trigger)
-        if clean_query.startswith("#"):
-            logger.info("Manual RAG trigger (#) detected.")
-            return IntentClassification(
-                intent="RETRIEVAL_REQUIRED", 
-                reason="Manual trigger via hashtag"
-            )
+        self.obj_config: AppConfig = obj_config
+        logger.info("SemanticRouter initialized (Trigger-based mode).")
 
-        # 2. 모델 기반 분류 (그 외의 경우)
-        try:
-            res_msg = self.llm.invoke(self.prompt.format(query=clean_query))
-            content = res_msg.content.strip()
-            
-            try:
-                parsed = self.parser.parse(content)
-                return IntentClassification(**parsed)
-            except:
-                content_upper = content.upper()
-                if "RETRIEVAL" in content_upper:
-                    return IntentClassification(intent="RETRIEVAL_REQUIRED", reason="Keyword match in model response")
-                return IntentClassification(intent="GENERAL_CONVERSATION", reason="Fallback to general conversation")
-                    
-        except Exception as e:
-            logger.error(f"Routing error: {e}")
-            return IntentClassification(intent="RETRIEVAL_REQUIRED", reason="Critical error fallback to RAG")
+    async def aroute_query(self, str_query: str) -> str:
+        """
+        질의의 시작 문자를 확인하여 의도를 즉시 분류한다.
+        - '#'으로 시작: RETRIEVAL_REQUIRED (RAG 검색 경로)
+        - 그 외: GENERAL_CONVERSATION (일반 대화 경로)
+        - 빈 값: AMBIGUOUS
+        """
+        str_stripped: str = str_query.strip()
+        
+        if not str_stripped:
+            logger.warning("Empty query received.")
+            return "AMBIGUOUS"
+
+        # 트리거 기호 '#' 확인
+        if str_stripped.startswith("#"):
+            logger.info(f"Trigger '#' detected. Routing to RETRIEVAL_REQUIRED.")
+            return "RETRIEVAL_REQUIRED"
+        
+        logger.info(f"No trigger detected. Routing to GENERAL_CONVERSATION.")
+        return "GENERAL_CONVERSATION"

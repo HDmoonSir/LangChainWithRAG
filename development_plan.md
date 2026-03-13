@@ -1,4 +1,4 @@
-# 고성능 Multi-LLM RAG 엔진 개발 계획 (Portfolio Grade)
+# 고성능 Multi-LLM RAG 엔진 개발 계획
 
 본 프로젝트는 LangChain을 활용하여, 로컬 환경에서 구동 가능한 Multi-LLM RAG 서비스 프로토타입을 구축하는 것을 목표로 합니다.
 
@@ -18,12 +18,15 @@
 - [x] **LLM API 서비스 구축 (vLLM Docker 기반):**
   - [x] LLM 1: vllm-router (Port 8001) - GPU 1 사용 (Semantic Router용)
   - [x] LLM 2: vllm-main (Port 8002) - GPU 0 사용 (Main Generator용)
-- [x] **Python 가상환경 및 의존성 설치:** (`requirements.txt` 및 `typing as tp` 리팩토링 완료)
+- [x] **Python 가상환경 및 의존성 설치:** (`requirements.txt` 완료)
+- [x] **Pydantic 기반 Settings 도입:** 필수 환경 변수(ENV) 검증 및 구조화된 설정 관리 체계 구축
 
 ### Phase 2: 고성능 데이터 인제스천 (Ingestion)
 - [x] **Docling 파이프라인:** PDF/Docx 내 표(Table), 계층 구조 추출 로직 구현 완료
 - [x] **Hybrid Chunking:** 마크다운 구조 기반의 Recursive Character Splitting 적용 완료
 - [x] **BGE-M3 Embedding:** 문서 벡터화 및 Qdrant 저장 (172.17.0.1 기반 연동 완료)
+- [x] **인덱싱 ID 결정화 (Fingerprinting):** 문서 해시 기반 고유 ID 생성 및 `upsert` 로직을 통한 중복 데이터 제거
+- [x] **Qdrant Collection Dimension 자동 감지:** 임베딩 모델 차원(Dimension) 자동 감지 및 컬렉션 정합성 검증 기능 추가
 
 ### Phase 3: 지능형 검색 및 분석 파이프라인 (Retrieval)
 - [x] **Semantic Router (Qwen-0.5B):**
@@ -40,12 +43,13 @@
 ### Phase 4: LangChain 오케스트레이션 및 API
 - [x] **LCEL(LangChain Expression Language) 기반 체인 설계:**
   - [x] Router -> (Retriever -> Reranker) -> Generator 전체 파이프라인 통합 및 테스트 완료
-- [ ] **FastAPI 스트리밍 서버:** 응답 지연 시간(Latency) 최소화를 위한 Stream 지원
+- [x] **FastAPI Lifespan 도입:** 서버 구동 시 파이프라인 및 모든 의존성(Models, Clients)의 명시적 초기화 완료
+- [x] **FastAPI 스트리밍 서버:** 응답 지연 시간(Latency) 최소화를 위한 SSE(Server-Sent Events) 지원 완료
+- [x] **SSE 프레임 표준화:** `token`, `error`, `metadata`, `finish` 이벤트를 포함한 표준화된 JSON 프레임 응답 구조화
 - [x] **Prompt Engineering:** 각 역할별(Router, Refiner, Generator) 페르소나 및 Few-shot 최적화 완료
 
 ### Phase 5: 검증 및 시각화
-- [ ] **RAGAS 기반 평가:** 검색 정확도(Faithfulness), 답변 관련성(Relevancy) 측정
-- [ ] **Portofolio용 문서화:** 성능 지표(Latency, Accuracy) 및 아키텍처 다이어그램 정리
+- [ ] **RAGAS 기반 평가:** 검색 정확도(Faithfulness), 답변 관련성(Relevancy) 측정 준비 중
 
 ---
 

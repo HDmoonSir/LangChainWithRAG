@@ -1,46 +1,16 @@
-import typing as tp
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from loguru import logger
+from fastapi import FastAPI
+from src.app.factory import AppFactory
 
-from src.rag.pipeline import RAGPipeline
-
-app = FastAPI(title="High-Performance Multi-LLM RAG Engine")
-
-# RAG 파이프라인 싱글톤 초기화
-pipeline = RAGPipeline()
-
-class QueryRequest(BaseModel):
-    query: str
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
-@app.post("/chat/stream")
-async def chat_stream(request: QueryRequest):
-    """
-    RAG 파이프라인을 통한 스트리밍 채팅 엔드포인트
-    """
-    if not request.query:
-        raise HTTPException(status_code=400, detail="Query cannot be empty")
-    
-    logger.info(f"API Request received: {request.query}")
-    
-    def generate():
-        try:
-            for chunk in pipeline.run(request.query):
-                # ChatOpenAI의 chunk에서 내용 추출
-                content = getattr(chunk, 'content', str(chunk))
-                if content:
-                    yield content
-        except Exception as e:
-            logger.error(f"Error during streaming: {e}")
-            yield f"\n[Error]: {str(e)}"
-
-    return StreamingResponse(generate(), media_type="text/event-stream")
+# 1. 앱 팩토리를 통한 애플리케이션 인스턴스 생성
+app: FastAPI = AppFactory.create_app()
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # 2. Uvicorn 서버 실행 상세 설정
+    uvicorn.run(
+        "run_server:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False,  # 운영 환경 안전성을 위해 False
+        workers=1      # 비동기 LLM 서비스의 특성상 단일 워커의 동시성 활용 권장
+    )
