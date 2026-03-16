@@ -78,6 +78,10 @@ python run_server.py
 
 > **Note on Dockerization**: 본 프로젝트의 API 서버용 `Dockerfile`은 사용자별 실행 환경(CUDA 가용 여부, 기본 이미지 선호도 등)이 상이하므로 포함되어 있지 않습니다. 컨테이너 배포가 필요한 경우, 프로젝트 루트에 `Dockerfile`을 생성하여 `docker/docker-compose.server.yaml`을 참조해 빌드하시기 바랍니다.
 
+## 💻 Web Interface
+
+서버 실행 후 브라우저에서 `http://localhost:7070/`에 접속하면 실시간 채팅 UI를 바로 사용할 수 있습니다.
+
 ## 📡 API Usage (SSE JSON Frame)
 
 ```bash
