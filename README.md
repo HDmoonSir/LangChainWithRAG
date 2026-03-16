@@ -5,11 +5,11 @@
 ## 🌟 Key Features
 
 - **Multi-LLM Pipeline**: 
-  - **Router/Rewriter**: Qwen2.5-0.5B (지연 시간 최소화 및 의도 분류)
+  - **Router**: Qwen2.5-0.5B (지연 시간 최소화 및 트리거 기반 의도 분류)
   - **Generator**: Qwen2.5-7B (정밀한 답변 생성)
-- **Hybrid Retrieval & Reranking**: 
-  - BGE-M3 임베딩을 통한 다국어 하이브리드 검색 지원
-  - BGE-Reranker-v2-m3를 이용한 검색 결과 2차 정밀 재정렬
+- **Two-stage Retrieval & Reranking**: 
+  - **Stage 1 (Vector Search)**: BGE-M3 임베딩을 통한 다국어 하이브리드 검색 지원
+  - **Stage 2 (Reranking)**: BGE-Reranker-v2-m3를 이용해 검색 결과의 관련성을 재평가하여 최상위 컨텍스트 정밀 재정렬
 - **Standardized SSE Streaming**: 
   - `token`, `error`, `metadata`, `finish` 프레임으로 표준화된 JSON 기반 실시간 응답
 - **Intelligent Routing**: 
@@ -17,19 +17,18 @@
 
 ## 🛡️ Technical Excellence
 
-- **Robust Configuration**: Pydantic 기반의 Settings 모델을 도입하여 필수 환경 변수(`.env`) 검증 및 타입 안전성 확보
-- **Lifespan Management**: FastAPI의 `lifespan` 이벤트를 통해 파이프라인 및 모델 클라이언트를 서버 시작 시 명시적으로 초기화 및 조립
-- **Deterministic Indexing**: 문서 해시(Fingerprint) 기반의 ID 생성 로직을 통해 동일 문서 재업로드 시 `upsert`를 통한 중복 데이터 제거
-- **Auto-Dimension Detection**: 임베딩 모델의 차원을 실시간 감지하여 Qdrant 컬렉션 정합성을 자동으로 검증 및 생성
-- **Modular Architecture**: 설정, 엔진, API 계층의 명확한 분리를 통한 유지보수성 및 확장성 확보
+- **Deterministic Indexing**: 문서 해시(Fingerprint) 기반의 고유 ID 생성 로직을 통해 동일 문서 재업로드 시 `upsert`를 수행하여 중복 데이터 자동 제거
+- **Auto-Dimension Detection**: 사용 중인 임베딩 모델의 차원(Dimension)을 실시간으로 감지하여 Qdrant 컬렉션 정합성을 자동으로 검증 및 생성
+- **Robust Configuration**: Pydantic 및 OmegaConf를 통한 환경 변수(`.env`) 검증 및 타입 안전성 확보
+- **Lifespan Management**: FastAPI `lifespan`을 통해 모델 클라이언트를 서버 시작 시 1회 초기화 및 주입
+- **Modular Architecture**: `schemas`, `config`, `langchain`, `ingestion` 계층의 명확한 분리로 유지보수성 극대화
 
 ## 🛠 Tech Stack
 
 - **Framework**: LangChain (LCEL)
-- **Serving**: vLLM (OpenAI Compatible API)
-- **Parsing**: Docling (High-performance Document Analysis)
+- **Serving**: vllm (OpenAI Compatible API)
 - **Vector DB**: Qdrant
-- **Models**: Qwen2.5-0.5B-Instruct, Qwen2.5-7B-Instruct-GPTQ-Int4
+- **Parsing**: Docling (High-performance Document Analysis)
 - **API**: FastAPI (Asynchronous Stream Support)
 
 ## 📁 Project Structure
@@ -37,28 +36,32 @@
 ```text
 llm_langchain/
 ├── src/
-│   ├── app/               # API Transport Layer (Routes, Factory, Schemas, Streaming)
-│   ├── rag/               # Core Domain Logic (Pipeline, Router, Retriever, Rewriter)
+│   ├── app/               # API Transport Layer (Routes, Factory, Streaming)
+│   ├── langchain/         # Core Domain Logic (Pipeline, Router, Retriever, Rewriter)
 │   ├── ingestion/         # Data Pipeline (Docling, Embedder, Fingerprint)
-│   ├── config/            # Structured Configuration System
-│   └── utils/             # Common Utilities
+│   ├── schemas/           # Centralized Pydantic Models (Data Contracts)
+│   └── config/            # Structured Configuration Loader
 ├── config/                # YAML Settings & Centralized Prompts
 ├── data/docs/             # Source Documents (PDF/Docx)
-├── run_ingest.py          # Ingestion Entrypoint (Upsert Logic)
-└── run_server.py          # API Server Entrypoint (Lifespan Logic)
+├── docker/                # Infrastructure Orchestration (Qdrant, vLLM)
+├── run_ingest.py          # Ingestion Entrypoint
+└── run_server.py          # API Server Entrypoint
 ```
 
 ## 🚀 Getting Started
 
 ### 1. 인프라 가동 (Docker)
+로컬 인프라(Qdrant 및 vLLM 모델 서버)를 기동합니다.
 ```bash
-docker-compose up -d
+# Qdrant 및 모델 서버 기동 (llm-langchain-net 사용)
+docker-compose -f docker/docker-compose.infra.yaml up -d
 ```
 
 ### 2. 의존성 설치 및 환경 설정
+시스템 환경(CUDA 버전 등)에 맞춰 필요한 패키지를 설치합니다.
 ```bash
 pip install -r requirements.txt
-cp .env.example .env  # 필수 환경 변수(VLLM_URL 등) 설정
+cp .env.example .env  # 환경에 맞춰 ROUTER_LLM_URL, MAIN_LLM_URL 등을 수정하세요.
 ```
 
 ### 3. 데이터 인제스천 (중복 방지 지원)
@@ -68,9 +71,12 @@ python run_ingest.py
 ```
 
 ### 4. 서버 실행
+FastAPI 서버를 실행합니다.
 ```bash
 python run_server.py
 ```
+
+> **Note on Dockerization**: 본 프로젝트의 API 서버용 `Dockerfile`은 사용자별 실행 환경(CUDA 가용 여부, 기본 이미지 선호도 등)이 상이하므로 포함되어 있지 않습니다. 컨테이너 배포가 필요한 경우, 프로젝트 루트에 `Dockerfile`을 생성하여 `docker/docker-compose.server.yaml`을 참조해 빌드하시기 바랍니다.
 
 ## 📡 API Usage (SSE JSON Frame)
 
@@ -80,12 +86,5 @@ curl -X POST http://localhost:8000/chat/stream \
      -d '{"query": "#우리 회사 연차 규정을 요약해줘."}'
 ```
 
-**응답 예시 (Standardized Frame):**
-```json
-data: {"str_event": "token", "dict_data": {"token": "연"}}
-data: {"str_event": "token", "dict_data": {"token": "차"}}
-data: {"str_event": "finish", "dict_data": {"status": "complete"}}
-```
-
 ---
-본 프로젝트는 Titan V (12GB VRAM) 3장 환경에서 검증되었으며, GPU 가용성에 따라 동적으로 실행 장치(CUDA/CPU)를 선택합니다.
+본 프로젝트는 **Titan V (12GB VRAM) 3장** 환경에서 검증되었으며, GPU 가용성에 따라 동적으로 실행 장치(CUDA/CPU)를 선택하도록 설계되었습니다.

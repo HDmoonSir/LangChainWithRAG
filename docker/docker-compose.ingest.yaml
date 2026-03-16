@@ -1,0 +1,20 @@
+networks:
+  llm-rag-net:
+    external: true
+
+services:
+  # 5. RAG Ingestion Job (One-shot Batch)
+  llm-rag-ingest:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: llm-rag-ingest
+    env_file:
+      - ../.env
+    environment:
+      - CONFIG_PATH=config/settings.ingest.yaml
+      - ENV_PATH=.env
+    command: python run_ingest.py
+    networks:
+      - llm-rag-net
+    restart: "no"

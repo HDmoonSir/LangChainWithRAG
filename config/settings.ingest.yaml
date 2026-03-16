@@ -1,0 +1,11 @@
+vector_db:
+  collection_name: ${oc.env:COLLECTION_NAME, "kb_documents"}
+  embedding_model: ${oc.env:EMBEDDING_MODEL_NAME, "BAAI/bge-m3"}
+  reranker_model: ${oc.env:RERANKER_MODEL_NAME, "BAAI/bge-reranker-v2-m3"}
+  qdrant_url: ${oc.env:QDRANT_URL}
+  local_model_device: ${oc.env:LOCAL_MODEL_DEVICE, "cuda:2"}
+
+ingest:
+  chunk_size: ${oc.decode:${oc.env:CHUNK_SIZE, "800"}}
+  chunk_overlap: ${oc.decode:${oc.env:CHUNK_OVERLAP, "150"}}
+  input_glob: ${oc.env:INPUT_GLOB, "data/docs/*"}

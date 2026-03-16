@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
-from src.rag.pipeline import RAGPipeline
-from src.app.schemas import ChatRequest
+from src.langchain.pipeline import RAGPipeline
+from src.schemas.app import ChatRequest
 from src.app.streaming import ChatStreamGenerator
 
 # 라우터 생성 (가이드라인 네이밍 규칙 준수)

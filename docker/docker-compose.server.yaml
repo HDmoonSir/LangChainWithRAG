@@ -1,0 +1,21 @@
+networks:
+  llm-langchain-net:
+    external: true
+
+services:
+  # 4. LangChain API Server (FastAPI)
+  llm-langchain-server:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: llm-langchain-server
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    environment:
+      - CONFIG_PATH=config/settings.server.yaml
+      - ENV_PATH=.env
+    networks:
+      - llm-langchain-net
+    restart: always

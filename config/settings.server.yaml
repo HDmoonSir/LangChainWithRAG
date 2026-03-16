@@ -1,20 +1,20 @@
-# LLM Server Config
 llm_servers:
   router:
-    model_name: "qwen-router"
-    temperature: 0.0
+    model_name: ${oc.env:ROUTER_MODEL_NAME, "qwen-router"}
+    temperature: ${oc.decode:${oc.env:ROUTER_TEMPERATURE, "0.0"}}
+    url: ${oc.env:ROUTER_LLM_URL}
   main:
-    model_name: "qwen-main"
-    temperature: 0.3
+    model_name: ${oc.env:MAIN_MODEL_NAME, "qwen-main"}
+    temperature: ${oc.decode:${oc.env:MAIN_TEMPERATURE, "0.3"}}
+    url: ${oc.env:MAIN_LLM_URL}
 
-# Vector DB Config
 vector_db:
-  collection_name: "kb_documents"
-  embedding_model: "BAAI/bge-m3"
-  reranker_model: "BAAI/bge-reranker-v2-m3"
-  local_model_device: "cuda:2" # vLLM(0, 1번 점유) 환경을 피해 GPU 할당 시도 (TITAN V GPU 2번 사용)
+  collection_name: ${oc.env:COLLECTION_NAME, "kb_documents"}
+  embedding_model: ${oc.env:EMBEDDING_MODEL_NAME, "BAAI/bge-m3"}
+  reranker_model: ${oc.env:RERANKER_MODEL_NAME, "BAAI/bge-reranker-v2-m3"}
+  qdrant_url: ${oc.env:QDRANT_URL}
+  local_model_device: ${oc.env:LOCAL_MODEL_DEVICE, "cuda:2"}
 
-# Prompts
 prompts:
   router_system: |
     You are a strict intent classifier for a Korean company's RAG system.

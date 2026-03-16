@@ -1,7 +1,7 @@
 import json
 import typing as tp
 from loguru import logger
-from src.app.schemas import SSEFrame
+from src.schemas.app import SSEFrame
 
 class SSEFrameBuilder:
     """
