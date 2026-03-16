@@ -42,6 +42,7 @@ llm_langchain/
 │   ├── schemas/           # Centralized Pydantic Models (Data Contracts)
 │   └── config/            # Structured Configuration Loader
 ├── config/                # YAML Settings & Centralized Prompts
+├── static/                # Web Chat Interface (HTML, JS, CSS)
 ├── data/docs/             # Source Documents (PDF/Docx)
 ├── docker/                # Infrastructure Orchestration (Qdrant, vLLM)
 ├── run_ingest.py          # Ingestion Entrypoint
