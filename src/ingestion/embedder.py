@@ -37,12 +37,18 @@ class RAGEmbedder:
         )
 
     def _ensure_collection(self) -> None:
-        """컬렉션 존재 여부를 확인하고 없으면 생성한다."""
+        """컬렉션 존재 여부 및 차원 정합성을 확인하고 필요 시 생성한다."""
         list_probe: tp.List[float] = self.embeddings.embed_query(text="test")
         int_dim: int = len(list_probe)
         
         list_cols: tp.List[tp.Any] = self.client.get_collections().collections
-        if not any(obj_c.name == self.collection_name for obj_c in list_cols):
+        obj_existing: tp.Optional[tp.Any] = next(
+            (obj_c for obj_c in list_cols if obj_c.name == self.collection_name), 
+            None
+        )
+        
+        if obj_existing is None:
+            logger.info(f"Creating new collection: {self.collection_name} (Dim: {int_dim})")
             self.client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=models.VectorParams(
@@ -50,6 +56,19 @@ class RAGEmbedder:
                     distance=models.Distance.COSINE
                 )
             )
+        else:
+            # 기존 컬렉션의 차원 정합성 검증
+            obj_info = self.client.get_collection(collection_name=self.collection_name)
+            int_existingDim: int = obj_info.config.params.vectors.size
+            if int_existingDim != int_dim:
+                str_err: str = (
+                    f"Dimension mismatch in ingestion! "
+                    f"Expected {int_dim} (Model), but found {int_existingDim} (DB). "
+                    f"Recreate the collection or check model settings."
+                )
+                logger.error(str_err)
+                raise ValueError(str_err)
+            logger.info(f"Verified collection: {self.collection_name} (Dim: {int_dim})")
 
     def upsert_documents(
         self, 

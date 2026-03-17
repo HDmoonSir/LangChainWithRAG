@@ -1,19 +1,21 @@
 # Production-Ready Multi-LLM RAG Engine
 
-본 프로젝트는 LangChain(LCEL)을 기반으로 구축된 고성능 로컬 RAG 서비스입니다. 0.5B 모델을 통한 지능형 라우팅과 7B 모델의 강력한 답변 생성을 결합하였으며, 엔터프라이즈 급의 안정성을 위한 구조적 고도화가 적용되었습니다.
+본 프로젝트는 LangChain(LCEL)을 기반으로 구축된 고성능 로컬 RAG 서비스입니다. 0.5B 소형 모델을 활용한 효율적인 라우팅과 7B 모델의 강력한 답변 생성을 결합하여 실용적인 로컬 AI 환경을 구축하는 데 초점을 맞추었습니다.
 
 ## 🌟 Key Features
 
-- **Multi-LLM Pipeline**: 
-  - **Router**: Qwen2.5-0.5B (지연 시간 최소화 및 트리거 기반 의도 분류)
-  - **Generator**: Qwen2.5-7B (정밀한 답변 생성)
+- **Dual-LLM Infrastructure**: 
+  - **Router/Rewriter/Sub**: Qwen2.5-0.5B (저사양 환경에서도 지연 시간을 최소화하는 소형 모델 활용)
+  - **Main Generator**: Qwen2.5-7B (정밀한 상황 분석 및 고품질 답변 생성 전담)
+- **Efficiency-First Routing (# Trigger)**: 
+  - 0.5B 소형 모델의 의도 분류 정확도 한계를 보완하기 위해 `#` 접두어를 통한 명시적 RAG 활성화 방식을 채택하였습니다. 이는 모델의 추론 오류로 인한 검색 실패를 원천 차단하는 가장 실용적인 접근법입니다.
+- **Future-Ready Routing Logic**:
+  - 향후 더 높은 성능의 모델을 라우터로 사용할 경우를 대비하여, LLM 기반의 자동 의도 분류 코드가 이미 구현되어 주석 처리(Commented out) 되어 있습니다. 모델 성능이 확보되면 즉시 시맨틱 라우팅으로 전환 가능한 구조입니다.
 - **Two-stage Retrieval & Reranking**: 
   - **Stage 1 (Vector Search)**: BGE-M3 임베딩을 통한 다국어 하이브리드 검색 지원
   - **Stage 2 (Reranking)**: BGE-Reranker-v2-m3를 이용해 검색 결과의 관련성을 재평가하여 최상위 컨텍스트 정밀 재정렬
 - **Standardized SSE Streaming**: 
   - `token`, `error`, `metadata`, `finish` 프레임으로 표준화된 JSON 기반 실시간 응답
-- **Intelligent Routing**: 
-  - `#` 트리거를 통한 명시적 지식 검색(RAG) 강제 활성화 지원
 
 ## 🛡️ Technical Excellence
 
@@ -21,7 +23,6 @@
 - **Auto-Dimension Detection**: 사용 중인 임베딩 모델의 차원(Dimension)을 실시간으로 감지하여 Qdrant 컬렉션 정합성을 자동으로 검증 및 생성
 - **Robust Configuration**: Pydantic 및 OmegaConf를 통한 환경 변수(`.env`) 검증 및 타입 안전성 확보
 - **Lifespan Management**: FastAPI `lifespan`을 통해 모델 클라이언트를 서버 시작 시 1회 초기화 및 주입
-- **Modular Architecture**: `schemas`, `config`, `langchain`, `ingestion` 계층의 명확한 분리로 유지보수성 극대화
 
 ## 🛠 Tech Stack
 
@@ -37,7 +38,7 @@
 llm_langchain/
 ├── src/
 │   ├── app/               # API Transport Layer (Routes, Factory, Streaming)
-│   ├── langchain/         # Core Domain Logic (Pipeline, Router, Retriever, Rewriter)
+│   ├── langchain/         # Core Domain Logic (Pipeline, llm_*, Retriever)
 │   ├── ingestion/         # Data Pipeline (Docling, Embedder, Fingerprint)
 │   ├── schemas/           # Centralized Pydantic Models (Data Contracts)
 │   └── config/            # Structured Configuration Loader
@@ -52,7 +53,7 @@ llm_langchain/
 ## 🚀 Getting Started
 
 ### 1. 인프라 가동 (Docker)
-로컬 인프라(Qdrant 및 vLLM 모델 서버)를 기동합니다.
+로컬 인프라(Qdrant 및 vLLM 모델 서버)를 기동합니다. 현재 0.5B(Router/Sub)와 7B(Main) 2개의 모델 인스턴스를 사용하도록 구성되어 있습니다.
 ```bash
 # Qdrant 및 모델 서버 기동 (llm-langchain-net 사용)
 docker-compose -f docker/docker-compose.infra.yaml up -d
@@ -81,7 +82,7 @@ python run_server.py
 
 ## 💻 Web Interface
 
-서버 실행 후 브라우저에서 `http://localhost:7070/`에 접속하면 실시간 채팅 UI를 바로 사용할 수 있습니다.
+서버 실행 후 브라우저에서 `http://localhost:8000/`에 접속하면 실시간 채팅 UI를 바로 사용할 수 있습니다.
 
 ## 📡 API Usage (SSE JSON Frame)
 

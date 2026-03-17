@@ -3,6 +3,14 @@ llm_servers:
     model_name: ${oc.env:ROUTER_MODEL_NAME, "qwen-router"}
     temperature: ${oc.decode:${oc.env:ROUTER_TEMPERATURE, "0.0"}}
     url: ${oc.env:ROUTER_LLM_URL}
+  rewriter:
+    model_name: ${oc.env:REWRITER_MODEL_NAME, "qwen-rewriter"}
+    temperature: ${oc.decode:${oc.env:REWRITER_TEMPERATURE, "0.0"}}
+    url: ${oc.env:REWRITER_LLM_URL}
+  sub:
+    model_name: ${oc.env:SUB_MODEL_NAME, "qwen-sub"}
+    temperature: ${oc.decode:${oc.env:SUB_TEMPERATURE, "0.7"}}
+    url: ${oc.env:SUB_LLM_URL}
   main:
     model_name: ${oc.env:MAIN_MODEL_NAME, "qwen-main"}
     temperature: ${oc.decode:${oc.env:MAIN_TEMPERATURE, "0.3"}}
@@ -36,3 +44,8 @@ prompts:
     Use the following context to answer the user's question accurately.
     If the context doesn't contain the answer, say that you don't know based on the provided context.
     Answer in Korean.
+
+  general_chat_system: |
+    당신은 한국 기업의 친절한 AI 어시스턴트입니다. 
+    사용자의 일상적인 질문이나 인사에 대해 한국어로 정중하고 친절하게 답변해 주세요.
+    회사 내부 규정이나 문서에 대한 질문이 아니므로 일반적인 지식을 바탕으로 대화하면 됩니다.
